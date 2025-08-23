@@ -227,8 +227,9 @@ class MovieVectorServer:
             
             # Load movie data (sample for web interface)
             data_path = Path(__file__).parent.parent.parent / "data"
+            
             if not data_path.exists():
-                self.benchmark_status = {"status": "error", "progress": 0.0, "message": "Data directory not found"}
+                self.benchmark_status = {"status": "error", "progress": 0.0, "message": "Data directory not found. Please download MovieLens 20M dataset to data/ directory."}
                 return
             
             loader = MovieLensLoader(str(data_path))
@@ -311,7 +312,7 @@ def main():
     uvicorn.run(
         "server:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,
         reload=True,
         reload_dirs=[str(Path(__file__).parent)]
     )

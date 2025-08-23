@@ -1,4 +1,4 @@
-from pinecone import Pinecone, ServerlessSpec
+import pinecone
 from typing import List, Dict, Any
 from .base import VectorDB
 import os
@@ -21,7 +21,6 @@ class PineconeDB(VectorDB):
         self.environment = environment
         self.index_name = index_name
         self.dimension = dimension
-        self.pc = None
         self.index = None
 
     def setup(self, dim: int) -> None:
@@ -30,29 +29,27 @@ class PineconeDB(VectorDB):
             raise ValueError("Pinecone API key is required")
         
         self.dimension = dim
-        self.pc = Pinecone(api_key=self.api_key)
+        
+        # Initialize Pinecone
+        pinecone.init(api_key=self.api_key, environment=self.environment)
         
         # Check if index exists
-        existing_indexes = [idx['name'] for idx in self.pc.list_indexes()]
+        existing_indexes = pinecone.list_indexes()
         
         if self.index_name not in existing_indexes:
             # Create index if it doesn't exist
-            self.pc.create_index(
+            pinecone.create_index(
                 name=self.index_name,
                 dimension=self.dimension,
-                metric="cosine",
-                spec=ServerlessSpec(
-                    cloud="aws",
-                    region="us-east-1"
-                )
+                metric="cosine"
             )
             
             # Wait for index to be ready
-            while not self.pc.describe_index(self.index_name).status['ready']:
+            while not pinecone.describe_index(self.index_name).status['ready']:
                 time.sleep(1)
         
         # Connect to index
-        self.index = self.pc.Index(self.index_name)
+        self.index = pinecone.Index(self.index_name)
 
     def upsert(self, vectors: List[List[float]], payloads: List[Dict[str, Any]]) -> None:
         """Insert vectors and metadata into Pinecone."""
@@ -105,15 +102,13 @@ class PineconeDB(VectorDB):
 
     def teardown(self) -> None:
         """Clean up Pinecone resources."""
-        if self.pc and self.index_name:
-            try:
-                existing_indexes = [idx['name'] for idx in self.pc.list_indexes()]
-                if self.index_name in existing_indexes:
-                    self.pc.delete_index(self.index_name)
-            except Exception:
-                pass
+        try:
+            existing_indexes = pinecone.list_indexes()
+            if self.index_name in existing_indexes:
+                pinecone.delete_index(self.index_name)
+        except Exception:
+            pass
 
     def close(self) -> None:
         """Close Pinecone client."""
         self.index = None
-        self.pc = None

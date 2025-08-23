@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import List, Dict, Any, Optional
 from sentence_transformers import SentenceTransformer
 import torch
@@ -92,7 +92,7 @@ class MovieEmbedder:
             embedded_data: List of dictionaries with embeddings and metadata
             output_path: Path to save the parquet file
         """
-        # Convert to DataFrame for efficient storage
+        # Convert to Polars DataFrame for efficient storage
         df_data = []
         for item in embedded_data:
             row = item.copy()
@@ -100,8 +100,8 @@ class MovieEmbedder:
             row['embedding'] = str(row['embedding'])
             df_data.append(row)
         
-        df = pd.DataFrame(df_data)
-        df.to_parquet(output_path, index=False)
+        df = pl.DataFrame(df_data)
+        df.write_parquet(output_path)
         print(f"Embeddings saved to {output_path}")
     
     def load_embeddings(self, input_path: str) -> List[Dict]:
@@ -114,14 +114,13 @@ class MovieEmbedder:
         Returns:
             List of dictionaries with embeddings and metadata
         """
-        df = pd.read_parquet(input_path)
+        df = pl.read_parquet(input_path)
         embedded_data = []
         
-        for _, row in df.iterrows():
-            item = row.to_dict()
+        for row in df.to_dicts():
             # Convert embedding string back to list
-            item['embedding'] = eval(item['embedding'])
-            embedded_data.append(item)
+            row['embedding'] = eval(row['embedding'])
+            embedded_data.append(row)
         
         print(f"Loaded {len(embedded_data)} embeddings from {input_path}")
         return embedded_data

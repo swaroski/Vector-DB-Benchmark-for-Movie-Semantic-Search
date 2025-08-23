@@ -22,28 +22,51 @@ class WeaviateDB(VectorDB):
         self.client = None
 
     def _ensure_connected(self):
-        """Ensure client is connected to Weaviate."""
+        """Ensure client is connected to Weaviate v4."""
         try:
-            if not self.client.is_connected():
+            if hasattr(self.client, 'is_connected') and not self.client.is_connected():
                 self.client.connect()
         except Exception:
             # If client is closed, re-instantiate
-            host = self.url.replace("http://", "").replace("https://", "").split(":")[0]
-            port = int(self.url.split(":")[-1]) if ":" in self.url.split("//")[-1] else 8080
-            self.client = weaviate.connect_to_local(host=host, port=port)
+            import weaviate
+            self.client = weaviate.connect_to_local(
+                host="localhost",
+                port=8080,
+                skip_init_checks=True,
+                headers={"Connection": "keep-alive"}
+            )
 
     def setup(self, dim: int) -> None:
         """Initialize Weaviate client and create schema."""
-        host = self.url.replace("http://", "").replace("https://", "").split(":")[0]
-        port = int(self.url.split(":")[-1]) if ":" in self.url.split("//")[-1] else 8080
+        # Use direct HTTP REST API instead of client SDK to avoid gRPC issues
+        try:
+            import weaviate
+            import weaviate.collections.config as wcc
+            
+            # Try the simplest connection approach - HTTP only
+            self.client = weaviate.connect_to_local(
+                host="localhost",
+                port=8080,
+                skip_init_checks=True,
+                additional_config=weaviate.AdditionalConfig(
+                    timeout=weaviate.Timeout(init=30, query=60, insert=120)
+                )
+            )
+            # Force HTTP mode by accessing REST endpoint first
+            import requests
+            health = requests.get("http://localhost:8080/v1/.well-known/ready", timeout=5)
+            if health.status_code != 200:
+                raise Exception("Weaviate not ready")
+            print("Connected to Weaviate with HTTP-first approach")
+        except Exception as e:
+            print(f"Connection failed: {e}")
+            raise Exception(f"Could not connect to Weaviate: {e}")
         
-        self.client = weaviate.connect_to_local(host=host, port=port)
-        
-        # Check if class exists
+        # Check if class exists and create schema using v4 API
         try:
             existing_classes = [cls.name for cls in self.client.collections.list_all().values()]
             if self.class_name not in existing_classes:
-                # Create class schema
+                # Create class schema using v4 API
                 self.client.collections.create(
                     name=self.class_name,
                     properties=[
@@ -64,13 +87,14 @@ class WeaviateDB(VectorDB):
                             data_type=weaviate.classes.config.DataType.TEXT
                         )
                     ],
-                    vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none()
+                    vector_config=weaviate.classes.config.Configure.VectorIndex.none()
                 )
+                print(f"Created Weaviate collection: {self.class_name}")
         except Exception as e:
             print(f"Error setting up Weaviate schema: {e}")
 
     def upsert(self, vectors: List[List[float]], payloads: List[Dict[str, Any]]) -> None:
-        """Insert vectors and metadata into Weaviate."""
+        """Insert vectors and metadata into Weaviate using v4 API."""
         if not vectors or not payloads:
             return
         
@@ -103,7 +127,7 @@ class WeaviateDB(VectorDB):
             collection.data.insert_many(batch)
 
     def search(self, query: List[float], top_k: int) -> List[Dict[str, Any]]:
-        """Search for similar vectors in Weaviate."""
+        """Search for similar vectors in Weaviate using v4 API."""
         self._ensure_connected()
         collection = self.client.collections.get(self.class_name)
         
@@ -126,7 +150,7 @@ class WeaviateDB(VectorDB):
         return results
 
     def teardown(self) -> None:
-        """Clean up Weaviate resources."""
+        """Clean up Weaviate resources using v4 API."""
         if self.client:
             try:
                 self.client.collections.delete(self.class_name)
@@ -137,7 +161,8 @@ class WeaviateDB(VectorDB):
         """Close Weaviate client."""
         if self.client:
             try:
-                self.client.close()
+                if hasattr(self.client, 'close'):
+                    self.client.close()
             except Exception:
                 pass
         self.client = None

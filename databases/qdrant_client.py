@@ -50,22 +50,41 @@ class QdrantDB(VectorDB):
 
     def search(self, query: List[float], top_k: int) -> List[Dict[str, Any]]:
         """Search for similar vectors in Qdrant."""
-        res = self.client.search(
-            collection_name=self.collection,
-            query_vector=query,
-            limit=top_k,
-            search_params=SearchParams(hnsw_ef=128),
-        )
+        from qdrant_client.models import PointStruct
         
-        # Format results to match our interface
-        results = []
-        for r in res:
-            result = r.payload.copy() if r.payload else {}
-            result['id'] = r.id
-            result['score'] = float(r.score)
-            results.append(result)
-        
-        return results
+        try:
+            # Try new API first
+            res = self.client.query_points(
+                collection_name=self.collection,
+                query=query,
+                limit=top_k,
+                search_params=SearchParams(hnsw_ef=128),
+            )
+            # Handle new API response format
+            results = []
+            for point in res.points:
+                result = point.payload.copy() if point.payload else {}
+                result['id'] = point.id
+                result['score'] = float(point.score)
+                results.append(result)
+            return results
+            
+        except (AttributeError, Exception):
+            # Fall back to old API if new one doesn't exist
+            res = self.client.search(
+                collection_name=self.collection,
+                query_vector=query,
+                limit=top_k,
+                search_params=SearchParams(hnsw_ef=128),
+            )
+            # Handle old API response format
+            results = []
+            for r in res:
+                result = r.payload.copy() if r.payload else {}
+                result['id'] = r.id
+                result['score'] = float(r.score)
+                results.append(result)
+            return results
 
     def teardown(self) -> None:
         """Clean up Qdrant resources."""

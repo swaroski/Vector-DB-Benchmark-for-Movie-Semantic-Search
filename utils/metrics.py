@@ -190,7 +190,7 @@ class BenchmarkMetrics:
             # Rating matching (for "high ratings" queries)
             if 'high rating' in query_lower:
                 avg_rating = movie.get('avg_rating', 0)
-                if avg_rating >= 4.0:  # Consider 4.0+ as high rating
+                if avg_rating is not None and avg_rating >= 4.0:  # Consider 4.0+ as high rating
                     relevant_movies.append(str(movie.get('movieId', movie.get('id', ''))))
         
         return list(set(relevant_movies))  # Remove duplicates

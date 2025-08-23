@@ -49,7 +49,7 @@ class MilvusDB(VectorDB):
         if utility.has_collection(self.collection_name):
             utility.drop_collection(self.collection_name)
         
-        # Define schema for movie data
+        # Define schema for movie data with conservative limits
         fields = [
             FieldSchema(
                 name="id", dtype=DataType.INT64, is_primary=True, auto_id=False
@@ -58,7 +58,7 @@ class MilvusDB(VectorDB):
             FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=dim),
             FieldSchema(name="title", dtype=DataType.VARCHAR, max_length=512),
             FieldSchema(name="genres", dtype=DataType.VARCHAR, max_length=256),
-            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=2048),
+            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=4000),
         ]
         
         schema = CollectionSchema(fields, description="Movie embeddings")
@@ -74,9 +74,9 @@ class MilvusDB(VectorDB):
         N = len(vectors)
         ids = list(range(N))
         movie_ids = [int(p.get("movieId", i)) for i, p in enumerate(payloads)]
-        titles = [self._safe_str(p.get("title", "Unknown"))[:512] for p in payloads]  # Limit length
-        genres = [self._safe_str(p.get("genres", "Unknown"))[:256] for p in payloads]
-        texts = [self._safe_str(p.get("text", ""))[:2048] for p in payloads]  # Limit length
+        titles = [self._safe_str(p.get("title", "Unknown"))[:500] for p in payloads]  # Limit length with buffer
+        genres = [self._safe_str(p.get("genres", "Unknown"))[:250] for p in payloads]  # Limit length with buffer
+        texts = [self._safe_str(p.get("text", ""))[:3900] for p in payloads]  # Limit with larger safety buffer
         
         # Insert in batches
         BATCH = 200  # standardized batch size

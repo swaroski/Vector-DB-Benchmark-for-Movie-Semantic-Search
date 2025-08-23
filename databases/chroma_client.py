@@ -25,41 +25,53 @@ class ChromaDB(VectorDB):
         
         try:
             self.collection = self.client.get_collection(name=self.collection_name)
-        except ValueError:
-            # Collection doesn't exist, create it
-            self.collection = self.client.create_collection(
-                name=self.collection_name,
-                metadata={"hnsw:space": "cosine"}
-            )
+            # Delete existing collection to start fresh
+            self.client.delete_collection(name=self.collection_name)
+        except (ValueError, Exception):
+            # Collection doesn't exist, which is fine
+            pass
+        
+        # Create new collection
+        self.collection = self.client.create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"}
+        )
 
     def upsert(self, vectors: List[List[float]], payloads: List[Dict[str, Any]]) -> None:
         """Insert vectors and metadata into ChromaDB."""
         if not vectors or not payloads:
             return
             
-        # Generate unique IDs for each vector
-        ids = [str(uuid.uuid4()) for _ in range(len(vectors))]
+        # Process in batches to handle ChromaDB batch size limits
+        batch_size = 1000  # Conservative batch size
         
-        # ChromaDB expects metadata as dict with string values
-        metadatas = []
-        documents = []
-        
-        for payload in payloads:
-            # Convert all metadata values to strings for ChromaDB
-            metadata = {k: str(v) for k, v in payload.items() if k not in ['embedding']}
-            metadatas.append(metadata)
+        for i in range(0, len(vectors), batch_size):
+            batch_vectors = vectors[i:i + batch_size]
+            batch_payloads = payloads[i:i + batch_size]
             
-            # Use title or movieId as document content
-            doc_text = payload.get('title', payload.get('movieId', ''))
-            documents.append(str(doc_text))
-        
-        # Add to collection
-        self.collection.add(
-            embeddings=vectors,
-            metadatas=metadatas,
-            documents=documents,
-            ids=ids
-        )
+            # Generate unique IDs for this batch
+            ids = [str(uuid.uuid4()) for _ in range(len(batch_vectors))]
+            
+            # ChromaDB expects metadata as dict with string values
+            metadatas = []
+            documents = []
+            
+            for payload in batch_payloads:
+                # Convert all metadata values to strings for ChromaDB
+                metadata = {k: str(v) for k, v in payload.items() if k not in ['embedding']}
+                metadatas.append(metadata)
+                
+                # Use title or movieId as document content
+                doc_text = payload.get('title', payload.get('movieId', ''))
+                documents.append(str(doc_text))
+            
+            # Add batch to collection
+            self.collection.add(
+                embeddings=batch_vectors,
+                metadatas=metadatas,
+                documents=documents,
+                ids=ids
+            )
 
     def search(self, query: List[float], top_k: int) -> List[Dict[str, Any]]:
         """Search for similar vectors in ChromaDB."""

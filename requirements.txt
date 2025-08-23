@@ -1,4 +1,4 @@
-pandas
+polars
 numpy
 scikit-learn
 matplotlib
@@ -17,7 +17,7 @@ PyYAML
 requests
 
 # Vector Database clients
-pinecone-client
+pinecone-client==3.2.2
 weaviate-client
 qdrant-client
 chromadb

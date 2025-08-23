@@ -10,7 +10,7 @@ import pandas as pd
 
 from data.loader import MovieLensLoader
 from embeddings.embed import MovieEmbedder
-from databases import VectorDB, PineconeDB, WeaviateDB, FaissDB, ChromaDB, QdrantDB, MilvusDB, TopKDB
+from databases import VectorDB, FaissDB, ChromaDB, PineconeDB, WeaviateDB, QdrantDB, MilvusDB, TopKDB
 from utils.metrics import BenchmarkMetrics, BenchmarkResult
 
 
