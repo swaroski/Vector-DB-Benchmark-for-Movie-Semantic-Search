@@ -1,0 +1,28 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+plotly
+sentence-transformers
+transformers
+torch
+datasets
+fastapi
+uvicorn
+pydantic
+python-dotenv
+tqdm
+PyYAML
+requests
+
+# Vector Database clients
+pinecone-client
+weaviate-client
+qdrant-client
+chromadb
+faiss-cpu
+sqlite-vec
+
+# Optional
+openai
