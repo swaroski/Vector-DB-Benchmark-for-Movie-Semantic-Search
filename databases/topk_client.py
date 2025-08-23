@@ -41,9 +41,9 @@ class TopKDB(VectorDB):
         
         # Create collection with schema matching movie fields
         schema = {
-            "id": topk_int().required(),
+            "id": text().required(),
             "vector": f32_vector(dimension=dim).required().index(vector_index(metric="cosine")),
-            "movieId": topk_int().required().index(keyword_index()),
+            "movieId": text().required().index(keyword_index()),
             "title": text().required().index(keyword_index()),
             "genres": text().index(keyword_index()),
             "text": text(),
@@ -66,9 +66,9 @@ class TopKDB(VectorDB):
             movie_id = meta.get("movieId", i)
             doc = {
                 "_id": str(movie_id),
-                "id": movie_id,
+                "id": str(movie_id),
                 "vector": vec,
-                "movieId": movie_id,
+                "movieId": str(movie_id),
                 "title": str(meta.get("title", "Unknown")),
                 "genres": str(meta.get("genres", "")),
                 "text": str(meta.get("text", "")),

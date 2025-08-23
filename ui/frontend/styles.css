@@ -375,9 +375,18 @@ header p {
     box-shadow: var(--shadow);
 }
 
+.chart-container.full-width {
+    width: 100%;
+    grid-column: 1 / -1;  /* Span all columns */
+}
+
 .chart-container canvas {
     width: 100% !important;
     height: 300px !important;
+}
+
+.chart-container.full-width canvas {
+    height: 400px !important;
 }
 
 /* Initialize Section */

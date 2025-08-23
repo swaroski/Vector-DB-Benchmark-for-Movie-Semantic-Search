@@ -48,8 +48,8 @@ class MovieVectorBenchmark:
                     'persist_directory': './chroma_db'
                 },
                 'pinecone': {
-                    'enabled': False,  # Requires API key
-                    'api_key': None,
+                    'enabled': bool(os.getenv('PINECONE_API_KEY')),  # Auto-enable if API key available
+                    'api_key': os.getenv('PINECONE_API_KEY'),
                     'index_name': 'movies'
                 },
                 'weaviate': {
@@ -68,8 +68,8 @@ class MovieVectorBenchmark:
                     'collection': 'movies'
                 },
                 'topk': {
-                    'enabled': False,  # Requires API key
-                    'api_key': None,
+                    'enabled': bool(os.getenv('TOPK_API_KEY')),  # Auto-enable if API key available
+                    'api_key': os.getenv('TOPK_API_KEY'),
                     'region': 'aws-us-east-1-elastica',
                     'collection': 'movies'
                 }

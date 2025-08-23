@@ -66,7 +66,7 @@ class MovieBenchmarkUI {
                 checkbox.type = 'checkbox';
                 checkbox.value = key;
                 checkbox.disabled = !db.available;
-                checkbox.checked = db.available && (key === 'faiss' || key === 'chroma');
+                checkbox.checked = db.available; // Check all available databases
                 
                 label.appendChild(checkbox);
                 label.appendChild(document.createTextNode(`${db.name} ${db.available ? '' : '(Unavailable)'}`));
@@ -525,6 +525,96 @@ function createCharts(results) {
                     title: {
                         display: true,
                         text: 'Hit Rate'
+                    }
+                }
+            }
+        }
+    });
+    
+    // Add a comprehensive comparison chart
+    createComparisonChart(results);
+}
+
+function createComparisonChart(results) {
+    // Add a comprehensive comparison chart container if not exists
+    const chartsContainer = document.getElementById('chartsContainer');
+    
+    // Check if comparison chart already exists, if not create it
+    let comparisonContainer = document.getElementById('comparisonChartContainer');
+    if (!comparisonContainer) {
+        comparisonContainer = document.createElement('div');
+        comparisonContainer.id = 'comparisonChartContainer';
+        comparisonContainer.className = 'chart-row';
+        comparisonContainer.innerHTML = `
+            <div class="chart-container full-width">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        `;
+        chartsContainer.appendChild(comparisonContainer);
+    }
+    
+    // Normalize metrics for radar chart (0-1 scale)
+    const metrics = ['throughput', 'avg_latency', 'recall_at_10', 'hit_rate'];
+    const maxValues = {
+        throughput: Math.max(...results.map(r => r.throughput)),
+        avg_latency: Math.max(...results.map(r => r.avg_latency)),
+        recall_at_10: 1, // Already normalized
+        hit_rate: 1 // Already normalized
+    };
+    
+    const datasets = results.map((result, index) => {
+        const colors = [
+            'rgba(37, 99, 235, 0.4)',   // Blue
+            'rgba(16, 185, 129, 0.4)',  // Green  
+            'rgba(245, 158, 11, 0.4)',  // Orange
+            'rgba(139, 92, 246, 0.4)',  // Purple
+            'rgba(239, 68, 68, 0.4)',   // Red
+        ];
+        
+        return {
+            label: result.database.toUpperCase(),
+            data: [
+                result.throughput / maxValues.throughput,
+                1 - (result.avg_latency / maxValues.avg_latency), // Inverted (lower is better)
+                result.recall_at_10,
+                result.hit_rate
+            ],
+            backgroundColor: colors[index % colors.length],
+            borderColor: colors[index % colors.length].replace('0.4', '1'),
+            borderWidth: 2,
+            pointRadius: 4
+        };
+    });
+    
+    const comparisonCtx = document.getElementById('comparisonChart').getContext('2d');
+    if (ui.charts.comparison) ui.charts.comparison.destroy();
+    
+    ui.charts.comparison = new Chart(comparisonCtx, {
+        type: 'radar',
+        data: {
+            labels: ['Throughput', 'Query Speed', 'Recall@10', 'Hit Rate'],
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Overall Performance Comparison',
+                    font: { size: 16 }
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: {
+                        stepSize: 0.2
                     }
                 }
             }

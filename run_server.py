@@ -16,4 +16,4 @@ if __name__ == "__main__":
     print(f"Data directory: {project_root / 'data'}")
     print(f"Data directory exists: {(project_root / 'data').exists()}")
     
-    uvicorn.run(app, host="0.0.0.0", port=8001, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8002, reload=False)
