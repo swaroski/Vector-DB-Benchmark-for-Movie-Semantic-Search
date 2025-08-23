@@ -48,6 +48,40 @@ movie-vector-benchmark/
 └── ...
 ```
 
+## Usage Options
+
+You can use this benchmark in two ways:
+
+### 🌐 Web Interface (Recommended)
+
+Launch the interactive web interface for easy benchmarking and movie search:
+
+```bash
+# Start the web server
+cd ui/backend
+python server.py
+
+# Or using uvicorn directly
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Then open your browser to `http://localhost:8000`
+
+**Web Interface Features:**
+- 🔍 **Interactive Movie Search**: Search movies with natural language queries
+- 📊 **Visual Benchmark Results**: Charts and graphs comparing database performance  
+- ⚡ **Real-time Status**: Live progress updates during benchmarking
+- 🎛️ **Easy Configuration**: Point-and-click database selection
+- 📱 **Responsive Design**: Works on desktop and mobile
+
+**Web Interface Workflow:**
+1. Click "Initialize System" to load movie data (one-time setup)
+2. Use "Search Movies" tab to test individual queries
+3. Use "Run Benchmark" tab to compare multiple databases
+4. View results with interactive charts in "View Results" tab
+
+### 💻 Command Line Interface
+
 ### Running the Benchmark
 
 #### Step 1: Prepare Your Data
@@ -68,38 +102,49 @@ mkdir -p data
 # data/genome-tags.csv
 ```
 
-#### Step 2: Choose Your Vector Databases
+#### Step 2: Generate Embeddings
 
-##### Local Databases (No Setup Required)
-These work out-of-the-box:
+Generate movie embeddings (this only needs to be done once):
+
 ```bash
-# Quick test with local databases only
-python benchmark.py --sample-size 1000
+# Quick generation with sample data (recommended for testing)
+python generate_embeddings.py --sample-size 1000
+
+# Full dataset (will take longer)
+python generate_embeddings.py --data-path ./data
+
+# Custom model and output
+python generate_embeddings.py --model "sentence-transformers/all-mpnet-base-v2" --output ./custom_embeddings.parquet
 ```
 
-##### Self-Hosted Databases (Docker Setup)
-Start the databases you want to test:
+#### Step 3: Start Vector Databases
+
+##### Using Docker Compose (Recommended)
+Start all databases with one command:
+
+```bash
+# Start all vector databases
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# Stop all databases
+docker-compose down
+```
+
+##### Individual Database Setup
+Or start databases individually:
 
 ```bash
 # Qdrant
 docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
 
-# Milvus
-docker run -d -p 19530:19530 -p 9091:9091 milvusdb/milvus:latest
+# Milvus (requires etcd and minio - use docker-compose instead)
+# See docker-compose.yml for full Milvus setup
 
 # Weaviate  
 docker run -d -p 8080:8080 semitechnologies/weaviate:latest
-```
-
-Then enable them in `config.yaml`:
-```yaml
-databases:
-  qdrant:
-    enabled: true
-  milvus:
-    enabled: true
-  weaviate:
-    enabled: true
 ```
 
 ##### Cloud Databases (API Keys Required)
@@ -120,38 +165,40 @@ export PINECONE_API_KEY="your_pinecone_key"
 export TOPK_API_KEY="your_topk_key"
 ```
 
-#### Step 3: Run Benchmarks
+#### Step 4: Run Benchmarks
 
-##### Option A: Quick Start (Local Databases Only)
+Now that embeddings are generated and databases are running:
+
+##### Option A: Quick Test (Local Databases)
 ```bash
-# Test with 1000 movies using Faiss and ChromaDB
-python benchmark.py --sample-size 1000
+# Benchmark local databases only
+python benchmark.py
 ```
 
 ##### Option B: Custom Configuration
 ```bash
 # Edit config.yaml to enable desired databases
-# Then run with custom config
-python benchmark.py --config config.yaml --data-path ./data
+# Then run benchmark
+python benchmark.py --config config.yaml
 ```
 
-##### Option C: Full Dataset Benchmark
+##### Option C: Command Line Override
 ```bash
-# Run with complete MovieLens 20M dataset (may take hours)
-python benchmark.py --data-path ./data
+# Override config with CLI arguments
+python benchmark.py --data-path ./data --model "sentence-transformers/all-mpnet-base-v2"
 ```
 
-##### Option D: Specific Database Testing
+#### Step 5: Launch Web Interface (Optional)
+
 ```bash
-# Test specific embedding models
-python benchmark.py --model "sentence-transformers/all-mpnet-base-v2" --sample-size 5000
-
-# Test with different sample sizes
-python benchmark.py --sample-size 500   # Small test
-python benchmark.py --sample-size 10000 # Medium test
+# Start the web server
+cd ui/backend
+python server.py
 ```
 
-#### Step 4: View Results
+Open `http://localhost:8000` for interactive search and visualization.
+
+#### Step 6: View Results
 
 The benchmark will output results like this:
 ```

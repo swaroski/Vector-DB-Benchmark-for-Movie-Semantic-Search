@@ -100,24 +100,20 @@ class MovieVectorBenchmark:
         
         print(f"Prepared {len(self.movie_data)} movies for embedding")
     
-    def generate_embeddings(self):
-        """Generate embeddings for movie data."""
+    def load_embeddings(self):
+        """Load pre-generated embeddings."""
         cache_path = self.config['embeddings']['cache_path']
         
-        # Check if embeddings are cached
-        if os.path.exists(cache_path):
-            print(f"Loading cached embeddings from {cache_path}")
-            self.embedder = MovieEmbedder(self.config['embeddings']['model'])
-            self.embedded_data = self.embedder.load_embeddings(cache_path)
-        else:
-            print("Generating embeddings...")
-            self.embedder = MovieEmbedder(self.config['embeddings']['model'])
-            self.embedded_data = self.embedder.embed_movies(
-                self.movie_data, 
-                batch_size=self.config['embeddings']['batch_size']
-            )
-            # Cache embeddings
-            self.embedder.save_embeddings(self.embedded_data, cache_path)
+        if not os.path.exists(cache_path):
+            print(f"ERROR: Embeddings file not found at {cache_path}")
+            print("Please generate embeddings first using:")
+            print(f"  python generate_embeddings.py --output {cache_path}")
+            raise FileNotFoundError(f"Embeddings file not found: {cache_path}")
+        
+        print(f"Loading embeddings from {cache_path}...")
+        self.embedder = MovieEmbedder(self.config['embeddings']['model'])
+        self.embedded_data = self.embedder.load_embeddings(cache_path)
+        print(f"✓ Loaded {len(self.embedded_data)} movie embeddings")
     
     def prepare_queries(self):
         """Prepare queries for benchmarking."""
@@ -255,9 +251,9 @@ class MovieVectorBenchmark:
         print("Starting Movie Vector Database Benchmark")
         print("=" * 50)
         
-        # Prepare data and embeddings
+        # Load data and pre-generated embeddings
         self.prepare_data()
-        self.generate_embeddings()
+        self.load_embeddings() 
         self.prepare_queries()
         
         # Run benchmarks

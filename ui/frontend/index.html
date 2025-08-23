@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Vector Database Benchmark</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.8"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 Movie Vector Database Benchmark</h1>
+            <p>Compare vector database performance for movie semantic search</p>
+        </header>
+
+        <!-- Status Panel -->
+        <div class="status-panel" id="statusPanel">
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot idle"></span>
+                <span id="statusText">System Ready</span>
+            </div>
+            <div class="progress-bar" id="progressBar" style="display: none;">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('search')">Search Movies</button>
+            <button class="tab-button" onclick="showTab('benchmark')">Run Benchmark</button>
+            <button class="tab-button" onclick="showTab('results')">View Results</button>
+        </div>
+
+        <!-- Search Tab -->
+        <div id="searchTab" class="tab-content active">
+            <div class="search-section">
+                <h2>Search Movies</h2>
+                <div class="search-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="searchQuery">Search Query:</label>
+                            <input type="text" id="searchQuery" placeholder="e.g., action movies with high ratings" 
+                                   value="action movies with high ratings">
+                        </div>
+                        <div class="form-group">
+                            <label for="searchDatabase">Vector Database:</label>
+                            <select id="searchDatabase">
+                                <option value="faiss">Faiss (Local)</option>
+                                <option value="chroma">ChromaDB (Local)</option>
+                                <option value="qdrant">Qdrant</option>
+                                <option value="milvus">Milvus</option>
+                                <option value="weaviate">Weaviate</option>
+                                <option value="pinecone">Pinecone</option>
+                                <option value="topk">TopK</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="topK">Results Count:</label>
+                            <select id="topK">
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button onclick="searchMovies()" class="btn btn-primary">Search Movies</button>
+                </div>
+
+                <div id="searchResults" class="search-results" style="display: none;">
+                    <div class="results-header">
+                        <h3>Search Results</h3>
+                        <div class="search-stats">
+                            <span id="searchTime"></span> | <span id="resultCount"></span>
+                        </div>
+                    </div>
+                    <div id="resultsList" class="results-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Benchmark Tab -->
+        <div id="benchmarkTab" class="tab-content">
+            <div class="benchmark-section">
+                <h2>Run Benchmark</h2>
+                <div class="benchmark-form">
+                    <div class="form-group">
+                        <label>Select Databases to Benchmark:</label>
+                        <div class="checkbox-grid" id="databaseCheckboxes">
+                            <label><input type="checkbox" value="faiss" checked> Faiss (Local)</label>
+                            <label><input type="checkbox" value="chroma" checked> ChromaDB (Local)</label>
+                            <label><input type="checkbox" value="qdrant"> Qdrant</label>
+                            <label><input type="checkbox" value="milvus"> Milvus</label>
+                            <label><input type="checkbox" value="weaviate"> Weaviate</label>
+                            <label><input type="checkbox" value="pinecone"> Pinecone</label>
+                            <label><input type="checkbox" value="topk"> TopK</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sampleSize">Sample Size:</label>
+                            <select id="sampleSize">
+                                <option value="500">500 (Quick)</option>
+                                <option value="1000" selected>1000 (Medium)</option>
+                                <option value="5000">5000 (Large)</option>
+                                <option value="10000">10000 (Very Large)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="embeddingModel">Embedding Model:</label>
+                            <select id="embeddingModel">
+                                <option value="sentence-transformers/all-MiniLM-L6-v2" selected>all-MiniLM-L6-v2 (Fast)</option>
+                                <option value="sentence-transformers/all-mpnet-base-v2">all-mpnet-base-v2 (Better Quality)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button onclick="runBenchmark()" class="btn btn-primary">Run Benchmark</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Tab -->
+        <div id="resultsTab" class="tab-content">
+            <div class="results-section">
+                <h2>Benchmark Results</h2>
+                <div id="benchmarkResults" class="benchmark-results">
+                    <p class="placeholder">No benchmark results yet. Run a benchmark to see results.</p>
+                </div>
+                <div id="chartsContainer" class="charts-container" style="display: none;">
+                    <div class="chart-row">
+                        <div class="chart-container">
+                            <canvas id="ingestChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="latencyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-row">
+                        <div class="chart-container">
+                            <canvas id="recallChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="hitRateChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Initialize Button -->
+        <div class="initialize-section" id="initializeSection">
+            <button onclick="initializeSystem()" class="btn btn-secondary">Initialize System</button>
+            <p class="init-info">Click to load movie data and generate embeddings (required before first use)</p>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
