@@ -23,6 +23,8 @@ qdrant-client
 chromadb
 faiss-cpu
 sqlite-vec
+pymilvus
+topk-sdk
 
 # Optional
 openai

@@ -28,6 +28,23 @@ databases:
   weaviate:
     enabled: false              # Set to true if you have Weaviate running
     url: "http://localhost:8080"
+  
+  qdrant:
+    enabled: false              # Set to true if you have Qdrant running
+    url: "http://localhost:6333"
+    collection: "movies"
+  
+  milvus:
+    enabled: false              # Set to true if you have Milvus running
+    host: "localhost"
+    port: "19530"
+    collection: "movies"
+  
+  topk:
+    enabled: false              # Set to true and provide API key to enable
+    api_key: null               # Set your TopK API key or use TOPK_API_KEY env var
+    region: "aws-us-east-1-elastica"
+    collection: "movies"
 
 benchmark:
   top_k: 10                    # Number of results to retrieve per query

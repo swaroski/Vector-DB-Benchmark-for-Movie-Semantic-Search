@@ -50,19 +50,165 @@ movie-vector-benchmark/
 
 ### Running the Benchmark
 
-1. **Quick Start (with sample data)**:
+#### Step 1: Prepare Your Data
+
+Download the MovieLens 20M dataset from [Kaggle](https://www.kaggle.com/datasets/grouplens/movielens-20m-dataset):
+
 ```bash
+# Create data directory
+mkdir -p data
+
+# Download and extract MovieLens 20M dataset
+# (You'll need to download from Kaggle manually)
+# Extract the files to the data/ directory:
+# data/movies.csv
+# data/ratings.csv  
+# data/tags.csv
+# data/genome-scores.csv
+# data/genome-tags.csv
+```
+
+#### Step 2: Choose Your Vector Databases
+
+##### Local Databases (No Setup Required)
+These work out-of-the-box:
+```bash
+# Quick test with local databases only
 python benchmark.py --sample-size 1000
 ```
 
-2. **Custom configuration**:
+##### Self-Hosted Databases (Docker Setup)
+Start the databases you want to test:
+
 ```bash
+# Qdrant
+docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
+
+# Milvus
+docker run -d -p 19530:19530 -p 9091:9091 milvusdb/milvus:latest
+
+# Weaviate  
+docker run -d -p 8080:8080 semitechnologies/weaviate:latest
+```
+
+Then enable them in `config.yaml`:
+```yaml
+databases:
+  qdrant:
+    enabled: true
+  milvus:
+    enabled: true
+  weaviate:
+    enabled: true
+```
+
+##### Cloud Databases (API Keys Required)
+Set up your API keys:
+
+```bash
+# Copy environment template
+cp .env.sample .env
+
+# Edit .env and add your keys:
+# PINECONE_API_KEY=your_key_here
+# TOPK_API_KEY=your_key_here
+```
+
+Or export them directly:
+```bash
+export PINECONE_API_KEY="your_pinecone_key"
+export TOPK_API_KEY="your_topk_key"
+```
+
+#### Step 3: Run Benchmarks
+
+##### Option A: Quick Start (Local Databases Only)
+```bash
+# Test with 1000 movies using Faiss and ChromaDB
+python benchmark.py --sample-size 1000
+```
+
+##### Option B: Custom Configuration
+```bash
+# Edit config.yaml to enable desired databases
+# Then run with custom config
 python benchmark.py --config config.yaml --data-path ./data
 ```
 
-3. **Full dataset benchmark**:
+##### Option C: Full Dataset Benchmark
 ```bash
+# Run with complete MovieLens 20M dataset (may take hours)
 python benchmark.py --data-path ./data
+```
+
+##### Option D: Specific Database Testing
+```bash
+# Test specific embedding models
+python benchmark.py --model "sentence-transformers/all-mpnet-base-v2" --sample-size 5000
+
+# Test with different sample sizes
+python benchmark.py --sample-size 500   # Small test
+python benchmark.py --sample-size 10000 # Medium test
+```
+
+#### Step 4: View Results
+
+The benchmark will output results like this:
+```
+================================================================================
+BENCHMARK RESULTS
+================================================================================
+Database  Ingest Time (s)  Throughput (vec/s)  Avg Query Latency (ms)  P95 Query Latency (ms)  Recall@10  Hit Rate
+FAISS                1.23                 813                   2.45                    4.12      0.156     0.800
+CHROMA               2.87                 348                   8.91                   15.23      0.142     0.700
+QDRANT               1.89                 529                   3.21                    5.67      0.134     0.750
+MILVUS               2.15                 465                   4.33                    7.89      0.148     0.780
+```
+
+#### Step 5: Generate Visualizations (Optional)
+
+```python
+from benchmark import MovieVectorBenchmark
+from plot_benchmarks import BenchmarkPlotter
+
+# Run benchmark and get results
+benchmark = MovieVectorBenchmark()
+results = benchmark.run_benchmark()
+
+# Generate plots
+plotter = BenchmarkPlotter(results)
+plotter.save_all_plots("output_plots/")
+```
+
+### Common Issues and Solutions
+
+#### Database Connection Issues
+```bash
+# Check if databases are running
+docker ps
+
+# Check ports are accessible
+netstat -tuln | grep -E '6333|19530|8080'
+
+# Restart databases if needed
+docker restart <container_id>
+```
+
+#### Memory Issues
+```bash
+# For large datasets, use smaller sample sizes
+python benchmark.py --sample-size 5000
+
+# Or use more efficient embedding models
+python benchmark.py --model "sentence-transformers/all-MiniLM-L6-v2"
+```
+
+#### API Rate Limits
+```bash
+# For cloud databases, use smaller batch sizes
+# Edit config.yaml:
+embeddings:
+  batch_size: 16  # Reduce from 32
 ```
 
 ## Configuration

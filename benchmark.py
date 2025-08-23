@@ -10,7 +10,7 @@ import pandas as pd
 
 from data.loader import MovieLensLoader
 from embeddings.embed import MovieEmbedder
-from databases import VectorDB, PineconeDB, WeaviateDB, FaissDB, ChromaDB
+from databases import VectorDB, PineconeDB, WeaviateDB, FaissDB, ChromaDB, QdrantDB, MilvusDB, TopKDB
 from utils.metrics import BenchmarkMetrics, BenchmarkResult
 
 
@@ -55,6 +55,23 @@ class MovieVectorBenchmark:
                 'weaviate': {
                     'enabled': False,  # Requires running instance
                     'url': 'http://localhost:8080'
+                },
+                'qdrant': {
+                    'enabled': False,  # Requires running instance
+                    'url': 'http://localhost:6333',
+                    'collection': 'movies'
+                },
+                'milvus': {
+                    'enabled': False,  # Requires running instance
+                    'host': 'localhost',
+                    'port': '19530',
+                    'collection': 'movies'
+                },
+                'topk': {
+                    'enabled': False,  # Requires API key
+                    'api_key': None,
+                    'region': 'aws-us-east-1-elastica',
+                    'collection': 'movies'
                 }
             },
             'benchmark': {
@@ -150,6 +167,26 @@ class MovieVectorBenchmark:
         elif db_name == 'weaviate':
             return WeaviateDB(
                 url=db_config.get('url', 'http://localhost:8080')
+            )
+        elif db_name == 'qdrant':
+            return QdrantDB(
+                url=db_config.get('url', 'http://localhost:6333'),
+                collection=db_config.get('collection', 'movies')
+            )
+        elif db_name == 'milvus':
+            return MilvusDB(
+                host=db_config.get('host', 'localhost'),
+                port=db_config.get('port', '19530'),
+                collection=db_config.get('collection', 'movies')
+            )
+        elif db_name == 'topk':
+            api_key = db_config.get('api_key') or os.getenv('TOPK_API_KEY')
+            if not api_key:
+                raise ValueError("TopK API key is required")
+            return TopKDB(
+                api_key=api_key,
+                region=db_config.get('region', 'aws-us-east-1-elastica'),
+                collection=db_config.get('collection', 'movies')
             )
         else:
             raise ValueError(f"Unknown database: {db_name}")
