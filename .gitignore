@@ -81,10 +81,8 @@ chroma_db/
 embeddings_cache.parquet
 
 # Plots
-plots/
-*.png
-*.jpg
-*.pdf
+
+
 
 # Logs
 *.log
