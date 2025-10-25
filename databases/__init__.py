@@ -45,4 +45,10 @@ try:
 except ImportError:
     TopKDB = None
 
+try:
+    from .postgres_client import PostgresDB
+    available_databases.append('PostgresDB')
+except ImportError:
+    PostgresDB = None
+
 __all__ = available_databases

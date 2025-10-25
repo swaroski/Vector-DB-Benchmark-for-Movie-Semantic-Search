@@ -15,12 +15,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 # Add parent directories to path for imports
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from data.loader import MovieLensLoader
 from embeddings.embed import MovieEmbedder
-from databases import VectorDB, FaissDB, ChromaDB, PineconeDB, WeaviateDB, QdrantDB, MilvusDB, TopKDB
+from databases import VectorDB, FaissDB, ChromaDB, PineconeDB, WeaviateDB, QdrantDB, MilvusDB, TopKDB, PostgresDB
 from utils.metrics import BenchmarkMetrics
 
 
@@ -95,9 +99,10 @@ class MovieVectorServer:
             databases = {
                 "faiss": {"name": "FAISS", "type": "local", "available": True, "description": "Facebook AI Similarity Search - Local file-based"},
                 "chroma": {"name": "ChromaDB", "type": "local", "available": True, "description": "Open-source embedding database"},
+                "postgres": {"name": "PostgreSQL", "type": "self-hosted", "available": self._check_postgres_available(), "description": "PostgreSQL with pgvector extension"},
                 "qdrant": {"name": "Qdrant", "type": "self-hosted", "available": True, "description": "Vector similarity search engine"},
                 "milvus": {"name": "Milvus", "type": "self-hosted", "available": True, "description": "Cloud-native vector database"},
-                "weaviate": {"name": "Weaviate", "type": "self-hosted", "available": False, "description": "Vector search engine (gRPC issues)"},
+                "weaviate": {"name": "Weaviate", "type": "self-hosted", "available": self._check_weaviate_available(), "description": "Vector search engine with GraphQL API"},
                 "pinecone": {"name": "Pinecone", "type": "cloud", "available": bool(os.getenv("PINECONE_API_KEY")), "description": "Managed vector database service"},
                 "topk": {"name": "TopK", "type": "cloud", "available": bool(os.getenv("TOPK_API_KEY")), "description": "Managed vector search platform"}
             }
@@ -181,18 +186,48 @@ class MovieVectorServer:
         except Exception:
             return False
     
+    def _check_postgres_available(self) -> bool:
+        """Check if PostgreSQL is available."""
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost",
+                port=5432,
+                database="movies",
+                user="postgres",
+                password="postgres",
+                connect_timeout=3
+            )
+            conn.close()
+            return True
+        except:
+            return False
+    
+    def _check_weaviate_available(self) -> bool:
+        """Check if Weaviate is available."""
+        try:
+            import requests
+            resp = requests.get("http://localhost:8080/v1/.well-known/ready", timeout=3)
+            return resp.status_code == 200
+        except:
+            return False
+    
     def _get_database_instance(self, db_name: str) -> VectorDB:
         """Get database instance by name."""
         if db_name == "faiss":
             return FaissDB()
         elif db_name == "chroma":
             return ChromaDB()
+        elif db_name == "postgres":
+            return PostgresDB(password="postgres")
         elif db_name == "qdrant":
             return QdrantDB()
         elif db_name == "milvus":
             return MilvusDB()
         elif db_name == "weaviate":
-            return WeaviateDB()
+            api_key = os.getenv("WEAVIATE_API_KEY")
+            url = os.getenv("WEAVIATE_URL", "http://localhost:8080")
+            return WeaviateDB(url=url, api_key=api_key)
         elif db_name == "pinecone":
             api_key = os.getenv("PINECONE_API_KEY")
             if not api_key:

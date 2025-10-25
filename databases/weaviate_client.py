@@ -9,17 +9,20 @@ warnings.filterwarnings("ignore", message=".*unclosed.*", category=ResourceWarni
 
 
 class WeaviateDB(VectorDB):
-    def __init__(self, url: str = "http://localhost:8080", class_name: str = "Movie"):
+    def __init__(self, url: str = "http://localhost:8080", api_key: str = None, class_name: str = "Movie"):
         """
         Initialize Weaviate client.
         
         Args:
-            url: Weaviate instance URL
+            url: Weaviate instance URL (for cloud: just the cluster URL without https://)
+            api_key: Weaviate API key (for cloud instances)
             class_name: Name of the Weaviate class/collection
         """
         self.url = url
+        self.api_key = api_key
         self.class_name = class_name
         self.client = None
+        self.is_cloud = api_key is not None
 
     def _ensure_connected(self):
         """Ensure client is connected to Weaviate v4."""
@@ -27,67 +30,74 @@ class WeaviateDB(VectorDB):
             if hasattr(self.client, 'is_connected') and not self.client.is_connected():
                 self.client.connect()
         except Exception:
-            # If client is closed, re-instantiate
-            import weaviate
-            self.client = weaviate.connect_to_local(
-                host="localhost",
-                port=8080,
-                skip_init_checks=True,
-                headers={"Connection": "keep-alive"}
-            )
+            pass
 
     def setup(self, dim: int) -> None:
         """Initialize Weaviate client and create schema."""
-        # Use direct HTTP REST API instead of client SDK to avoid gRPC issues
         try:
             import weaviate
-            import weaviate.collections.config as wcc
+            from weaviate.classes.init import AdditionalConfig, Timeout, Auth
             
-            # Try the simplest connection approach - HTTP only
-            self.client = weaviate.connect_to_local(
-                host="localhost",
-                port=8080,
-                skip_init_checks=True,
-                additional_config=weaviate.AdditionalConfig(
-                    timeout=weaviate.Timeout(init=30, query=60, insert=120)
+            if self.is_cloud:
+                cluster_url = self.url
+                if not cluster_url.startswith('http'):
+                    cluster_url = f'https://{cluster_url}'
+                
+                # Use simple connect_to_custom for cloud
+                self.client = weaviate.WeaviateClient(
+                    connection_params=weaviate.connect.ConnectionParams.from_params(
+                        http_host=self.url,
+                        http_port=443,
+                        http_secure=True,
+                        grpc_host=self.url,
+                        grpc_port=50051,
+                        grpc_secure=True
+                    ),
+                    auth_client_secret=Auth.api_key(self.api_key),
+                    additional_config=AdditionalConfig(
+                        timeout=Timeout(init=30, query=60, insert=120)
+                    )
                 )
-            )
-            # Force HTTP mode by accessing REST endpoint first
-            import requests
-            health = requests.get("http://localhost:8080/v1/.well-known/ready", timeout=5)
-            if health.status_code != 200:
-                raise Exception("Weaviate not ready")
-            print("Connected to Weaviate with HTTP-first approach")
+                self.client.connect()
+                print(f"Connected to Weaviate Cloud: {self.url}")
+            else:
+                self.client = weaviate.connect_to_local(
+                    host="localhost",
+                    port=8080,
+                    skip_init_checks=True,
+                    additional_config=AdditionalConfig(
+                        timeout=Timeout(init=30, query=60, insert=120)
+                    )
+                )
+                
+                import requests
+                health = requests.get("http://localhost:8080/v1/.well-known/ready", timeout=5)
+                if health.status_code != 200:
+                    raise Exception("Weaviate not ready")
+                print("Connected to Weaviate local")
         except Exception as e:
             print(f"Connection failed: {e}")
             raise Exception(f"Could not connect to Weaviate: {e}")
         
         # Check if class exists and create schema using v4 API
         try:
+            from weaviate.classes.config import Configure, Property, DataType, VectorDistances
+            
             existing_classes = [cls.name for cls in self.client.collections.list_all().values()]
             if self.class_name not in existing_classes:
-                # Create class schema using v4 API
+                # Create class schema using v4 API with proper vectorizer config
                 self.client.collections.create(
                     name=self.class_name,
                     properties=[
-                        weaviate.classes.config.Property(
-                            name="movieId",
-                            data_type=weaviate.classes.config.DataType.INT
-                        ),
-                        weaviate.classes.config.Property(
-                            name="title",
-                            data_type=weaviate.classes.config.DataType.TEXT
-                        ),
-                        weaviate.classes.config.Property(
-                            name="genres",
-                            data_type=weaviate.classes.config.DataType.TEXT
-                        ),
-                        weaviate.classes.config.Property(
-                            name="tags",
-                            data_type=weaviate.classes.config.DataType.TEXT
-                        )
+                        Property(name="movieId", data_type=DataType.INT),
+                        Property(name="title", data_type=DataType.TEXT),
+                        Property(name="genres", data_type=DataType.TEXT),
+                        Property(name="tags", data_type=DataType.TEXT)
                     ],
-                    vector_config=weaviate.classes.config.Configure.VectorIndex.none()
+                    vectorizer_config=Configure.Vectorizer.none(),
+                    vector_index_config=Configure.VectorIndex.hnsw(
+                        distance_metric=VectorDistances.COSINE
+                    )
                 )
                 print(f"Created Weaviate collection: {self.class_name}")
         except Exception as e:

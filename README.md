@@ -8,20 +8,23 @@ This project provides a systematic comparison of different vector databases for 
 
 ## Features
 
-- **7 Vector Databases**: Supports Faiss, ChromaDB, Qdrant, Milvus, Weaviate, Pinecone, and TopK
+- **8 Vector Databases**: Supports Faiss, ChromaDB, Qdrant, Milvus, Weaviate (Cloud & Local), Pinecone, TopK, and PostgreSQL (pgvector)
 - **High Performance**: Polars-based data processing for efficient handling of large datasets
 - **Rich Movie Embeddings**: Combines movie titles, genres, user ratings, and tags for comprehensive embeddings
 - **Comprehensive Metrics**: Evaluates ingestion time, query latency, recall@k, and hit rates
-- **Flexible Configuration**: YAML-based configuration with environment variable support
+- **Flexible Configuration**: Auto-detects available databases via API keys and Docker
 - **Web Interface**: Interactive FastAPI/uvicorn-based interface for search and benchmarking
-- **Docker Compose**: Easy setup of all database dependencies
+- **Docker Compose**: One-command setup of all self-hosted databases
 - **Dataset Flexibility**: Support for both sample and full MovieLens 20M dataset
+- **Automatic Visualizations**: Auto-generates 5 performance comparison charts
+- **Cloud & Self-Hosted**: Mix and match cloud services with self-hosted databases
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.8+
+- Docker & Docker Compose
 - MovieLens 20M dataset (download from [Kaggle](https://www.kaggle.com/datasets/grouplens/movielens-20m-dataset))
 
 ### Installation
@@ -48,6 +51,12 @@ movie-vector-benchmark/
 │   └── genome-tags.csv
 ├── benchmark.py
 └── ...
+```
+
+4. (Optional) Configure cloud database API keys:
+```bash
+cp .env.sample .env
+# Edit .env and add your API keys for Weaviate Cloud, Pinecone, TopK
 ```
 
 ## Usage Options
@@ -132,89 +141,106 @@ python generate_embeddings.py --data-path ./data
 python generate_embeddings.py --model "sentence-transformers/all-mpnet-base-v2" --output ./custom_embeddings.parquet
 ```
 
-#### Step 3: Start Vector Databases
+#### Step 3: Configure API Keys (for Cloud Databases)
 
-##### Using Docker Compose (Recommended)
-Start all databases with one command:
+If you want to test cloud databases (Weaviate Cloud, Pinecone, TopK), add your API keys to `.env`:
 
 ```bash
-# Start all vector databases
+# Copy the sample environment file
+cp .env.sample .env
+
+# Edit .env and add your API keys:
+nano .env
+```
+
+Add these lines to your `.env` file:
+```bash
+# Weaviate Cloud (optional)
+WEAVIATE_URL=your-cluster.weaviate.cloud
+WEAVIATE_API_KEY=your_weaviate_api_key
+
+# Pinecone (optional)
+PINECONE_API_KEY=your_pinecone_api_key
+
+# TopK (optional)
+TOPK_API_KEY=your_topk_api_key
+TOPK_REGION=aws-us-east-1-elastica
+```
+
+#### Step 4: Start Vector Databases
+
+##### Option A: Using Docker Compose (Recommended - Easiest)
+Start all self-hosted databases with one command:
+
+```bash
+# Start all vector databases (PostgreSQL, Qdrant, Milvus, Weaviate local)
 docker-compose up -d
 
 # Check status
 docker-compose ps
 
-# Stop all databases
+# View logs if needed
+docker-compose logs -f
+
+# Stop all databases when done
 docker-compose down
 ```
 
-##### Individual Database Setup
+##### Option B: Individual Docker Containers
 Or start databases individually:
 
 ```bash
+# PostgreSQL with pgvector
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres --name pgvector ankane/pgvector
+docker exec -it pgvector psql -U postgres -c "CREATE DATABASE movies;"
+
 # Qdrant
-docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
+docker run -d -p 6333:6333 --name qdrant qdrant/qdrant
 
-# Milvus (requires etcd and minio - use docker-compose instead)
-# See docker-compose.yml for full Milvus setup
+# Milvus (requires dependencies - use docker-compose instead)
+# See docker-compose.yml for full setup
 
-# Weaviate  
-docker run -d -p 8080:8080 semitechnologies/weaviate:latest
+# Weaviate (local - or use cloud with API key)
+docker run -d -p 8080:8080 --name weaviate semitechnologies/weaviate:latest
 ```
 
-##### Cloud Databases (API Keys Required)
-Set up your API keys:
+**Note**: Cloud databases (Weaviate Cloud, Pinecone, TopK) auto-enable when API keys are detected in `.env`
 
-```bash
-# Copy environment template
-cp .env.sample .env
-
-# Edit .env and add your keys:
-# PINECONE_API_KEY=your_key_here
-# TOPK_API_KEY=your_key_here
-```
-
-Or export them directly:
-```bash
-export PINECONE_API_KEY="your_pinecone_key"
-export TOPK_API_KEY="your_topk_key"
-```
-
-#### Step 4: Run Benchmarks
+#### Step 5: Run Benchmarks
 
 Now that embeddings are generated and databases are running:
 
-##### Option A: Quick Test (Local Databases)
 ```bash
-# Benchmark local databases only
+# Run benchmark (automatically tests all enabled databases and generates visualizations)
 python benchmark.py
 ```
 
-##### Option B: Custom Configuration
+The benchmark will:
+- Test all enabled databases (Faiss, ChromaDB, Qdrant, Milvus, Weaviate, PostgreSQL)
+- Display results table in terminal
+- Auto-generate 5 visualization charts in `./plots/` directory:
+  - `ingest_performance.png` - Ingestion time & throughput
+  - `query_performance.png` - Average & P95 query latency
+  - `recall_metrics.png` - Recall@1, @5, @10, @20
+  - `hit_rate.png` - Hit rate comparison
+  - `combined_performance.png` - Comprehensive dashboard with radar chart
+
+##### Custom Configuration
 ```bash
-# Edit config.yaml to enable desired databases
+# Edit config.yaml to enable/disable databases
 # Then run benchmark
 python benchmark.py --config config.yaml
 ```
 
-##### Option C: Command Line Override
+##### Command Line Override
 ```bash
 # Override config with CLI arguments
 python benchmark.py --data-path ./data --model "sentence-transformers/all-mpnet-base-v2"
 ```
 
-#### Step 5: Launch Web Interface (Optional)
-
-```bash
-# Start the web server from project root
-python simple_server.py
-```
-
-Open `http://localhost:8002` for interactive search and visualization.
-
 #### Step 6: View Results
 
-The benchmark will output results like this (actual results from tested databases):
+Terminal output:
 ```
 ================================================================================
 BENCHMARK RESULTS
@@ -223,24 +249,22 @@ Database        Ingest Time (s)  Throughput (vec/s)  Avg Query Latency (ms)  P95
 FAISS                      1.84               1304                   3.09              4.23      0.007     1.000
 CHROMA                     2.73               1093                   2.93              4.15      0.007     1.000
 QDRANT                     2.40               1248                   4.27              6.89      0.007     1.000
+POSTGRES                   3.15                952                   5.12              7.84      0.007     1.000
+
+Generating visualizations...
+✓ Saved 5 plots to ./plots/
 ```
 
-**Note**: Results will vary based on your hardware, dataset size, and configuration.
+Visual results are automatically saved to `./plots/` directory.
 
-#### Step 5: Generate Visualizations (Optional)
+#### Step 7: Launch Web Interface (Optional)
 
-```python
-from benchmark import MovieVectorBenchmark
-from plot_benchmarks import BenchmarkPlotter
-
-# Run benchmark and get results
-benchmark = MovieVectorBenchmark()
-results = benchmark.run_benchmark()
-
-# Generate plots
-plotter = BenchmarkPlotter(results)
-plotter.save_all_plots("output_plots/")
+```bash
+# Start the web server from project root
+python simple_server.py
 ```
+
+Open `http://localhost:8002` for interactive search and visualization.
 
 ### Common Issues and Solutions
 
@@ -344,12 +368,17 @@ databases:
     enabled: true             # Requires Docker
   milvus:
     enabled: true             # Requires Docker  
+  postgres:
+    enabled: true             # Requires Docker (pgvector)
+    password: postgres        # Docker default password
   weaviate:
-    enabled: true             # Requires Docker
+    enabled: auto             # Auto-enables if WEAVIATE_API_KEY in .env
+    url: auto                 # Uses WEAVIATE_URL from .env or localhost
+    api_key: auto             # Uses WEAVIATE_API_KEY from .env
   pinecone:
-    enabled: false            # Requires API key
+    enabled: auto             # Auto-enables if PINECONE_API_KEY in .env
   topk:
-    enabled: false            # Requires API key
+    enabled: auto             # Auto-enables if TOPK_API_KEY in .env
 ```
 
 ## Supported Vector Databases
@@ -359,22 +388,40 @@ databases:
 - **Faiss**: High-performance similarity search library by Facebook AI
 - **ChromaDB**: Open-source embedding database with built-in persistence
 
-### Docker-based Databases (Docker Required)
+### Self-Hosted Databases (Docker Required)
 
+- **PostgreSQL (pgvector)**: PostgreSQL extension for vector similarity search with IVFFlat indexing
 - **Qdrant**: Fast and scalable vector similarity search engine
 - **Milvus**: Cloud-native vector database with horizontal scalability  
-- **Weaviate**: Open-source vector search engine with GraphQL API
+- **Weaviate (Local)**: Open-source vector search engine - can run locally via Docker
 
-### Cloud Databases (API Keys Required)
+### Cloud Databases (API Keys Required - Auto-detected from .env)
 
-- **Pinecone**: Managed vector database service (requires API key)
-- **TopK**: Managed vector search platform (requires API key)
+- **Weaviate Cloud**: Managed Weaviate clusters (requires `WEAVIATE_URL` + `WEAVIATE_API_KEY`)
+- **Pinecone**: Managed vector database service (requires `PINECONE_API_KEY`)
+- **TopK**: Managed vector search platform (requires `TOPK_API_KEY`)
 
 ### Database Setup Instructions
 
-#### Docker-based Databases (Qdrant, Milvus, Weaviate)
+#### Docker-based Databases (PostgreSQL, Qdrant, Milvus, Weaviate)
 
-Use the included Docker Compose setup:
+Start all databases individually:
+```bash
+# PostgreSQL with pgvector
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres --name pgvector ankane/pgvector
+docker exec -it pgvector psql -U postgres -c "CREATE DATABASE movies;"
+
+# Qdrant
+docker run -d -p 6333:6333 --name qdrant qdrant/qdrant
+
+# Weaviate
+docker run -d -p 8080:8080 --name weaviate semitechnologies/weaviate:latest
+
+# Milvus
+docker run -d -p 19530:19530 --name milvus milvusdb/milvus:latest
+```
+
+Or use Docker Compose:
 ```bash
 # Start all databases
 docker-compose up -d
@@ -384,18 +431,6 @@ docker-compose ps
 
 # Stop all databases
 docker-compose down
-```
-
-Or start individually:
-```bash
-# Qdrant
-docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
-
-# Milvus (complex setup - use docker-compose instead)
-# See docker-compose.yml for complete Milvus configuration with etcd and minio
-
-# Weaviate  
-docker run -d -p 8080:8080 -e QUERY_DEFAULTS_LIMIT=25 -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true -e PERSISTENCE_DATA_PATH='/var/lib/weaviate' semitechnologies/weaviate:1.24.4
 ```
 
 #### Cloud Database Setup
@@ -439,12 +474,17 @@ docker run -d -p 8080:8080 -e QUERY_DEFAULTS_LIMIT=25 -e AUTHENTICATION_ANONYMOU
 
 ### Metrics Explained
 
-- **Ingest Time**: Time to load all vectors into the database
-- **Throughput**: Vectors processed per second during ingestion
-- **Query Latency**: Time to execute a single search query (average)
-- **P95 Latency**: 95th percentile query latency (worst-case performance)
-- **Recall@k**: Percentage of relevant results in top-k results
-- **Hit Rate**: Percentage of queries with at least one relevant result
+- **Ingest Time (s)**: Total time in seconds to insert all movie vectors into the database. Lower is better. Measures bulk loading performance - important for initial data setup and batch updates.
+
+- **Throughput (vec/s)**: Number of vectors inserted per second during ingestion. Higher is better. Calculated as `total_vectors / ingest_time`. Indicates how fast the database can handle bulk data imports.
+
+- **Avg Query Latency (ms)**: Average time in milliseconds to execute a single similarity search query. Lower is better. This is the mean response time users would experience when searching for similar movies.
+
+- **P95 Query Latency (ms)**: 95th percentile query latency - the latency threshold below which 95% of queries complete. Lower is better. Represents near-worst-case performance, showing how the database handles slower queries. More reliable than max latency which can be skewed by outliers.
+
+- **Recall@10**: Percentage of relevant movie results found in the top 10 search results (0.0 to 1.0). Higher is better. A recall of 0.007 means 0.7% of all relevant movies were retrieved in the top 10. Measures search quality and relevance.
+
+- **Hit Rate**: Percentage of queries that returned at least one relevant result (0.0 to 1.0). Higher is better. A hit rate of 1.000 means 100% of searches found something useful. Measures whether the database can find any relevant matches at all.
 
 ### Sample Output (Actual Test Results)
 
@@ -482,6 +522,7 @@ movie-vector-benchmark/
 │   ├── qdrant_client.py      # Qdrant implementation
 │   ├── milvus_client.py      # Milvus implementation
 │   ├── weaviate_client.py    # Weaviate implementation
+│   ├── postgres_client.py    # PostgreSQL pgvector implementation
 │   ├── pinecone_client.py    # Pinecone implementation
 │   └── topk_client.py        # TopK implementation
 ├── embeddings/

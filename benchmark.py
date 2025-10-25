@@ -7,10 +7,15 @@ import yaml
 from pathlib import Path
 from typing import List, Dict, Any
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from data.loader import MovieLensLoader
 from embeddings.embed import MovieEmbedder
-from databases import VectorDB, FaissDB, ChromaDB, PineconeDB, WeaviateDB, QdrantDB, MilvusDB, TopKDB
+from databases import VectorDB, FaissDB, ChromaDB, PineconeDB, WeaviateDB, QdrantDB, MilvusDB, TopKDB, PostgresDB
 from utils.metrics import BenchmarkMetrics, BenchmarkResult
 
 
@@ -53,16 +58,17 @@ class MovieVectorBenchmark:
                     'index_name': 'movies'
                 },
                 'weaviate': {
-                    'enabled': False,  # Requires running instance
-                    'url': 'http://localhost:8080'
+                    'enabled': bool(os.getenv('WEAVIATE_API_KEY')),
+                    'url': os.getenv('WEAVIATE_URL', 'http://localhost:8080'),
+                    'api_key': os.getenv('WEAVIATE_API_KEY')
                 },
                 'qdrant': {
-                    'enabled': False,  # Requires running instance
+                    'enabled': True,
                     'url': 'http://localhost:6333',
                     'collection': 'movies'
                 },
                 'milvus': {
-                    'enabled': False,  # Requires running instance
+                    'enabled': True,
                     'host': 'localhost',
                     'port': '19530',
                     'collection': 'movies'
@@ -72,6 +78,15 @@ class MovieVectorBenchmark:
                     'api_key': os.getenv('TOPK_API_KEY'),
                     'region': 'aws-us-east-1-elastica',
                     'collection': 'movies'
+                },
+                'postgres': {
+                    'enabled': True,
+                    'host': 'localhost',
+                    'port': 5432,
+                    'database': 'movies',
+                    'user': 'postgres',
+                    'password': 'postgres',
+                    'table': 'movies'
                 }
             },
             'benchmark': {
@@ -161,8 +176,10 @@ class MovieVectorBenchmark:
                 index_name=db_config.get('index_name', 'movies')
             )
         elif db_name == 'weaviate':
+            api_key = db_config.get('api_key') or os.getenv('WEAVIATE_API_KEY')
             return WeaviateDB(
-                url=db_config.get('url', 'http://localhost:8080')
+                url=db_config.get('url', 'http://localhost:8080'),
+                api_key=api_key
             )
         elif db_name == 'qdrant':
             return QdrantDB(
@@ -183,6 +200,15 @@ class MovieVectorBenchmark:
                 api_key=api_key,
                 region=db_config.get('region', 'aws-us-east-1-elastica'),
                 collection=db_config.get('collection', 'movies')
+            )
+        elif db_name == 'postgres':
+            return PostgresDB(
+                host=db_config.get('host', 'localhost'),
+                port=db_config.get('port', 5432),
+                database=db_config.get('database', 'movies'),
+                user=db_config.get('user', 'postgres'),
+                password=db_config.get('password', ''),
+                table=db_config.get('table', 'movies')
             )
         else:
             raise ValueError(f"Unknown database: {db_name}")
@@ -321,6 +347,15 @@ def main():
     try:
         results = benchmark.run_benchmark()
         benchmark.print_results(results)
+        
+        # Generate visualizations
+        if results:
+            from plot_benchmarks import BenchmarkPlotter
+            print("\nGenerating visualizations...")
+            plotter = BenchmarkPlotter(results)
+            saved_files = plotter.save_all_plots()
+            print(f"✓ Saved {len(saved_files)} plots to ./plots/")
+            
     except KeyboardInterrupt:
         print("\nBenchmark interrupted by user")
     except Exception as e:

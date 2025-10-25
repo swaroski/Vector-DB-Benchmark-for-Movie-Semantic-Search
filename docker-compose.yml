@@ -4,6 +4,23 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: ankane/pgvector:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=movies
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vector-benchmark
+
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -97,6 +114,7 @@ services:
       - vector-benchmark
 
 volumes:
+  postgres_data:
   qdrant_storage:
   milvus_etcd:
   milvus_minio:
